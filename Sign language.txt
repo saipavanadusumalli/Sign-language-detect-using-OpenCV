@@ -1,0 +1,77 @@
+import cv2
+import numpy as np
+
+def count_fingers(frame, mask):
+   
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    
+
+    if len(contours) == 0:
+        return 0
+
+
+    contour = max(contours, key=cv2.contourArea)
+    
+
+    hull = cv2.convexHull(contour)
+    
+
+    defects = cv2.convexityDefects(contour, cv2.convexHull(contour, returnPoints=False))
+    
+
+    finger_count = 0
+    if defects is not None:
+        for i in range(defects.shape[0]):
+            s, e, f, d = defects[i, 0]
+            start = tuple(contour[s][0])
+            end = tuple(contour[e][0])
+            far = tuple(contour[f][0])
+            if d > 10000:  # A threshold to detect a finger
+                finger_count += 1
+                
+    return finger_count
+
+
+lower_skin = np.array([0, 20, 70], dtype=np.uint8)
+upper_skin = np.array([20, 255, 255], dtype=np.uint8)
+
+
+cap = cv2.VideoCapture(0)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    hsv_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+
+    mask = cv2.inRange(hsv_frame, lower_skin, upper_skin)
+    
+
+    mask = cv2.GaussianBlur(mask, (5, 5), 0)
+
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+
+    if len(contours) > 0:
+        largest_contour = max(contours, key=cv2.contourArea)
+        cv2.drawContours(frame, [largest_contour], -1, (0, 255, 0), 2)
+
+
+    finger_count = count_fingers(frame, mask)
+
+
+    cv2.putText(frame, f"Fingers: {finger_count}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+
+
+    cv2.imshow("Mask", mask)
+    cv2.imshow("Hand Gesture Recognition", frame)
+
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
